@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alzheimer's Voice Detection System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        .risk-very-high { background: linear-gradient(135deg, #dc3545, #c82333); color: white; }
+        .risk-high { background: linear-gradient(135deg, #fd7e14, #e55a00); color: white; }
+        .risk-moderate { background: linear-gradient(135deg, #ffc107, #e0a800); color: black; }
+        .risk-low-moderate { background: linear-gradient(135deg, #20c997, #1aa085); color: white; }
+        .risk-low { background: linear-gradient(135deg, #28a745, #1e7e34); color: white; }
+        
+        .biomarker-card {
+            border-left: 4px solid #007bff;
+            transition: transform 0.2s;
+        }
+        
+        .biomarker-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .status-normal { color: #28a745; }
+        .status-concerning { color: #ffc107; }
+        .status-abnormal { color: #dc3545; }
+        
+        .upload-area {
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #0056b3;
+            background-color: #f8f9fa;
+        }
+        
+        .upload-area.dragover {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        
+        .recording-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            font-size: 24px;
+            transition: all 0.3s ease;
+        }
+        
+        .recording-btn.recording {
+            background-color: #dc3545;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .results-section {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+                    <div class="container">
+                        <a class="navbar-brand" href="#">
+                            <i class="fas fa-brain me-2"></i>
+                            Alzheimer's Voice Detection System
+                        </a>
+                        <div class="biomarker-section">
+                            <h4>Clinical Observations</h4>
+                            <div id="clinical-observations"></div>
+                        </div>
+                        
+                        <div class="biomarker-section">
+                            <h4>Clinical Domain Analysis</h4>
+                            <div id="clinical-domains"></div>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </div>
+        
+        <div class="container">
+            <!-- Task Selection Section -->
+            <div class="row mb-4">
+                <div class="col-lg-10 mx-auto">
+                    <div class="card shadow">
+                        <div class="card-header bg-info text-white">
+                            <h4 class="mb-0"><i class="fas fa-tasks me-2"></i>Structured Speech Tasks</h4>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-3">Choose a speech task below. Each task is designed to assess different aspects of speech and language function.</p>
+                            <div class="row" id="taskSelection">
+                                <!-- Task cards will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Task Prompt Section -->
+            <div class="row mb-4" id="taskPromptSection" style="display: none;">
+                <div class="col-lg-10 mx-auto">
+                    <div class="card shadow border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h4 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Task Instructions</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="taskPrompt" class="mb-3">
+                                <!-- Task prompt will be inserted here -->
+                            </div>
+                            <div id="taskImage" class="text-center mb-3" style="display: none;">
+                                <!-- Task image will be inserted here -->
+                            </div>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Instructions:</strong> Read the prompt above carefully, then click "Start Recording" when you're ready to begin.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recording Section -->
+            <div class="row mb-5">
+                <div class="col-lg-8 mx-auto">
+                    <div class="card shadow">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0"><i class="fas fa-microphone me-2"></i>Voice Recording</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5>Record Your Response</h5>
+                                    <div class="text-center mb-3">
+                                        <button id="recordBtn" class="recording-btn btn btn-primary" disabled>
+                                            <i class="fas fa-microphone"></i>
+                                        </button>
+                                    </div>
+                                    <div id="recordingStatus" class="text-center text-muted">
+                                        Select a task first
+                                    </div>
+                                    <div id="recordingTimer" class="text-center mt-2" style="display: none;">
+                                        <span class="badge bg-danger fs-6">Recording: <span id="timerDisplay">00:00</span></span>
+                                    </div>
+                                    <div id="recordingConfirmation" class="text-center mt-3" style="display: none;">
+                                        <div class="alert alert-success">
+                                            <i class="fas fa-check-circle me-2"></i>
+                                            <strong>Recording Saved!</strong>
+                                            <div class="mt-2">
+                                                <audio id="playbackAudio" controls style="width: 100%; max-width: 300px;">
+                                                    Your browser does not support the audio element.
+                                                </audio>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Or Upload Audio File</h5>
+                                    <div class="upload-area" id="uploadArea">
+                                        <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                        <p class="mb-2">Drag & drop audio file here</p>
+                                        <p class="text-muted small">or click to browse</p>
+                                        <input type="file" id="audioFile" accept="audio/*" style="display: none;">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                                        <button id="analyzeBtn" class="btn btn-success btn-lg me-md-2" disabled>
+                                            <i class="fas fa-chart-line me-2"></i>Analyze Recording
+                                        </button>
+                                        <button id="demoBtn" class="btn btn-outline-primary btn-lg">
+                                            <i class="fas fa-play me-2"></i>Try Demo
+                                        </button>
+                                        <button id="resetBtn" class="btn btn-outline-secondary btn-lg">
+                                            <i class="fas fa-redo me-2"></i>Reset
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Loading Section -->
+            <div class="row loading-spinner" id="loadingSection">
+                <div class="col-12 text-center">
+                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">Analyzing voice patterns...</p>
+                </div>
+            </div>
+            
+            <!-- Results Section -->
+            <div class="results-section" id="resultsSection">
+                <!-- Risk Assessment -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card shadow" id="riskCard">
+                            <div class="card-body text-center">
+                                <h2 class="mb-3">Risk Assessment</h2>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <h1 id="riskScore" class="display-4">--</h1>
+                                        <p class="lead">Risk Score</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h3 id="riskTier" class="mb-2">--</h3>
+                                        <p id="riskDescription" class="mb-0">--</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="alert alert-info">
+                                            <strong>Recommendation:</strong>
+                                            <p id="riskRecommendation" class="mb-0">--</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Transcript -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card shadow">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>Speech Transcript</h5>
+                            </div>
+                            <div class="card-body">
+                                <p id="transcript" class="lead">--</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Biomarkers -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h3 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Biomarker Analysis</h3>
+                        <div class="row" id="biomarkersContainer">
+                            <!-- Biomarker cards will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Clinical Observations -->
+                <div class="row mb-4" id="clinicalSection" style="display: none;">
+                    <div class="col-12">
+                        <h3 class="mb-3"><i class="fas fa-stethoscope me-2"></i>Clinical Observations</h3>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0"><i class="fas fa-pause-circle me-2"></i>Pause Analysis</h6>
+                                    </div>
+                                    <div class="card-body" id="pauseAnalysis">
+                                        <!-- Pause analysis content -->
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Hesitation Patterns</h6>
+                                    </div>
+                                    <div class="card-body" id="hesitationPatterns">
+                                        <!-- Hesitation patterns content -->
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0"><i class="fas fa-microphone me-2"></i>Speech Motor Control</h6>
+                                    </div>
+                                    <div class="card-body" id="speechMotorControl">
+                                        <!-- Speech motor control content -->
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h6 class="mb-0"><i class="fas fa-brain me-2"></i>Cognitive-Linguistic Markers</h6>
+                                    </div>
+                                    <div class="card-body" id="cognitiveLinguistic">
+                                        <!-- Cognitive linguistic content -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Clinical Impression -->
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="card border-primary">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="fas fa-user-md me-2"></i>Clinical Impression</h5>
+                                    </div>
+                                    <div class="card-body" id="clinicalImpression">
+                                        <!-- Clinical impression content -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Clinical Domain Analysis -->
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="card border-danger">
+                                    <div class="card-header bg-danger text-white">
+                                        <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Clinical Domain Analysis</h5>
+                                    </div>
+                                    <div class="card-body" id="clinicalDomains">
+                                        <!-- Clinical domains content -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Feature Visualization -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card shadow">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Feature Analysis</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="featureChart"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Clinical Disclaimer -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Important Medical Disclaimer</h6>
+                            <p class="mb-0">This tool is for research and educational purposes only. It is not intended for medical diagnosis. 
+                            Always consult with qualified healthcare professionals for medical advice and diagnosis. 
+                            Early detection and professional evaluation are crucial for proper care.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        let currentAudioFile = null;
+        let selectedTask = null;
+        let recordingTimerInterval = null;
+        let recordingStartTime = 0;
+        let availableTasks = {};
+
+        // DOM elements
+        const recordBtn = document.getElementById('recordBtn');
+        const recordingStatus = document.getElementById('recordingStatus');
+        const uploadArea = document.getElementById('uploadArea');
+        const audioFileInput = document.getElementById('audioFile');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const demoBtn = document.getElementById('demoBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const loadingSection = document.getElementById('loadingSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const taskSelection = document.getElementById('taskSelection');
+        const taskPromptSection = document.getElementById('taskPromptSection');
+        const taskPrompt = document.getElementById('taskPrompt');
+        const recordingTimerEl = document.getElementById('recordingTimer');
+        const timerDisplay = document.getElementById('timerDisplay');
+
+        // Initialize tasks on page load
+        document.addEventListener('DOMContentLoaded', loadTasks);
+        
+        // Event listeners
+        recordBtn.addEventListener('click', toggleRecording);
+        resetBtn.addEventListener('click', resetInterface);
+        
+        async function loadTasks() {
+            try {
+                const response = await fetch('/tasks');
+                availableTasks = await response.json();
+                displayTaskSelection();
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+        }
+        
+        function displayTaskSelection() {
+            taskSelection.innerHTML = '';
+            
+            Object.entries(availableTasks).forEach(([taskId, taskInfo]) => {
+                const taskCard = document.createElement('div');
+                taskCard.className = 'col-md-6 col-lg-4 mb-3';
+                
+                const taskName = taskId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const duration = taskInfo.target_duration;
+                
+                taskCard.innerHTML = `
+                    <div class="card task-card h-100" data-task="${taskId}" style="cursor: pointer; transition: transform 0.2s;">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">${taskName}</h6>
+                            <p class="card-text small text-muted">Duration: ~${duration} seconds</p>
+                            <div class="task-focus">
+                                ${taskInfo.analysis_focus.map(focus => `<span class="badge bg-light text-dark me-1">${focus.replace(/_/g, ' ')}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                taskCard.addEventListener('click', () => selectTask(taskId));
+                taskCard.addEventListener('mouseenter', () => {
+                    taskCard.style.transform = 'translateY(-2px)';
+                });
+                taskCard.addEventListener('mouseleave', () => {
+                    taskCard.style.transform = 'translateY(0)';
+                });
+                
+                taskSelection.appendChild(taskCard);
+            });
+        }
+        
+        async function selectTask(taskId) {
+            selectedTask = taskId;
+            
+            // Fetch a new random prompt for this task
+            try {
+                const response = await fetch(`/tasks/${taskId}`);
+                const taskInfo = await response.json();
+                
+                // Update the cached task info with new prompt
+                availableTasks[taskId] = taskInfo;
+                
+                // Update UI to show selected task
+                document.querySelectorAll('.task-card').forEach(card => {
+                    card.classList.remove('border-primary');
+                    card.style.backgroundColor = '';
+                });
+                
+                const selectedCard = document.querySelector(`[data-task="${taskId}"]`);
+                selectedCard.classList.add('border-primary');
+                selectedCard.style.backgroundColor = '#f8f9fa';
+                
+                // Show task prompt with new random prompt
+                taskPrompt.innerHTML = `<h5>${taskId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5><p>${taskInfo.prompt}</p>`;
+                taskPromptSection.style.display = 'block';
+                
+                // Enable recording
+                recordBtn.disabled = false;
+                recordingStatus.textContent = 'Ready to record - Click to start';
+                
+                // Scroll to prompt
+                taskPromptSection.scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                console.error('Error fetching new prompt:', error);
+                // Fallback to cached prompt if fetch fails
+                const taskInfo = availableTasks[taskId];
+                taskPrompt.innerHTML = `<h5>${taskId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5><p>${taskInfo.prompt}</p>`;
+                taskPromptSection.style.display = 'block';
+            }
+        }
+        
+        function resetInterface() {
+            selectedTask = null;
+            currentAudioFile = null;
+            
+            // Reset task selection
+            document.querySelectorAll('.task-card').forEach(card => {
+                card.classList.remove('border-primary');
+                card.style.backgroundColor = '';
+            });
+            
+            // Hide sections
+            taskPromptSection.style.display = 'none';
+            resultsSection.style.display = 'none';
+            document.getElementById('recordingConfirmation').style.display = 'none';
+            
+            // Reset buttons and status
+            recordBtn.disabled = true;
+            analyzeBtn.disabled = true;
+            recordingStatus.textContent = 'Select a task first';
+            
+            // Reset upload area
+            uploadArea.innerHTML = `
+                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                <p class="mb-2">Drag & drop audio file here</p>
+                <p class="text-muted small">or click to browse</p>
+            `;
+            
+            // Clear playback audio
+            const playbackAudio = document.getElementById('playbackAudio');
+            if (playbackAudio.src) {
+                URL.revokeObjectURL(playbackAudio.src);
+                playbackAudio.src = '';
+            }
+        }
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    recordedChunks = [];
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            recordedChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(recordedChunks, { type: 'audio/wav' });
+                        currentAudioFile = new File([blob], 'recording.wav', { type: 'audio/wav' });
+                        
+                        // Show recording confirmation with playback
+                        const audioUrl = URL.createObjectURL(blob);
+                        const playbackAudio = document.getElementById('playbackAudio');
+                        playbackAudio.src = audioUrl;
+                        
+                        document.getElementById('recordingConfirmation').style.display = 'block';
+                        analyzeBtn.disabled = false;
+                        recordingStatus.textContent = 'Recording saved successfully!';
+                        recordingTimerEl.style.display = 'none';
+                        
+                        if (recordingTimerInterval) {
+                            clearInterval(recordingTimerInterval);
+                            recordingTimerInterval = null;
+                        }
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.classList.add('recording');
+                    recordBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                    recordingStatus.textContent = 'Recording... Click to stop';
+                    
+                    // Start timer
+                    recordingStartTime = Date.now();
+                    recordingTimerEl.style.display = 'block';
+                    recordingTimerInterval = setInterval(updateTimer, 1000);
+                    
+                    function updateTimer() {
+                        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                        const seconds = (elapsed % 60).toString().padStart(2, '0');
+                        timerDisplay.textContent = `${minutes}:${seconds}`;
+                    }
+                } catch (error) {
+                    console.error('Error accessing microphone:', error);
+                    alert('Error accessing microphone. Please check permissions.');
+                }
+            } else {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                recordBtn.classList.remove('recording');
+                recordBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                
+                if (recordingTimerInterval) {
+                    clearInterval(recordingTimerInterval);
+                    recordingTimerInterval = null;
+                }
+            }
+        }
+
+        // File upload functionality
+        uploadArea.addEventListener('click', () => audioFileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        audioFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            currentAudioFile = file;
+            analyzeBtn.disabled = false;
+            uploadArea.innerHTML = `
+                <i class="fas fa-file-audio fa-3x text-success mb-3"></i>
+                <p class="mb-2">${file.name}</p>
+                <p class="text-muted small">Ready to analyze</p>
+            `;
+        }
+
+        // Analysis functionality
+        analyzeBtn.addEventListener('click', analyzeAudio);
+        demoBtn.addEventListener('click', runDemo);
+
+        async function analyzeAudio() {
+            if (!currentAudioFile) return;
+
+            showLoading();
+
+            const formData = new FormData();
+            formData.append('audio', currentAudioFile);
+            if (selectedTask) {
+                formData.append('task_type', selectedTask);
+            }
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const results = await response.json();
+                displayResults(results);
+            } catch (error) {
+                console.error('Analysis error:', error);
+                alert('Error analyzing audio. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function runDemo() {
+            showLoading();
+
+            try {
+                const response = await fetch('/demo');
+                const results = await response.json();
+                displayResults(results);
+            } catch (error) {
+                console.error('Demo error:', error);
+                alert('Error running demo. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showLoading() {
+            loadingSection.style.display = 'block';
+            resultsSection.style.display = 'none';
+        }
+
+        function hideLoading() {
+            loadingSection.style.display = 'none';
+            resultsSection.style.display = 'block';
+        }
+
+        function displayResults(results) {
+            // Update risk assessment
+            const riskCard = document.getElementById('riskCard');
+            const riskScore = document.getElementById('riskScore');
+            const riskTier = document.getElementById('riskTier');
+            const riskDescription = document.getElementById('riskDescription');
+            const riskRecommendation = document.getElementById('riskRecommendation');
+
+            riskScore.textContent = Math.round(results.risk_assessment.score);
+            riskTier.textContent = results.risk_assessment.tier;
+            riskDescription.textContent = results.risk_assessment.description;
+            riskRecommendation.textContent = results.risk_assessment.recommendation;
+
+            // Apply risk-based styling
+            const tier = results.risk_assessment.tier.toLowerCase().replace(/[^a-z]/g, '-');
+            riskCard.className = `card shadow risk-${tier}`;
+
+            // Update transcript
+            document.getElementById('transcript').textContent = results.transcript || 'No transcript available';
+
+            // Update biomarkers
+            displayBiomarkers(results.biomarkers);
+
+            // Create feature visualization
+            createFeatureChart(results.features);
+        }
+
+        function displayBiomarkers(biomarkers) {
+            const container = document.getElementById('biomarkersContainer');
+            container.innerHTML = '';
+
+            // Display clinical observations if available
+            if (biomarkers && biomarkers.clinical_observations) {
+                displayClinicalObservations(biomarkers.clinical_observations);
+            }
+            
+            // Display clinical domain analysis if available
+            if (biomarkers && biomarkers.clinical_domains) {
+                displayClinicalDomains(biomarkers.clinical_domains);
+            }
+
+            Object.entries(biomarkers).forEach(([category, data]) => {
+                if (category === 'clinical_observations' || category === 'clinical_domains') {
+                    return;
+                }
+                
+                const card = document.createElement('div');
+                card.className = 'col-md-6 col-lg-4 mb-3';
+                
+                const statusClass = getStatusClass(data.status);
+
+                card.innerHTML = `
+                    <div class="card biomarker-card h-100">
+                        <div class="card-body">
+                            <h6 class="card-title">${category.replace(/_/g, ' ').toUpperCase()}</h6>
+                            <p class="card-text ${statusClass}">
+                                <strong>Status:</strong> ${data.status}
+                            </p>
+                            ${data.interpretation ? `<p class="text-muted small">${data.interpretation}</p>` : ''}
+                            <div class="feature-grid">
+                                ${Object.entries(data).filter(([key]) => !['status', 'interpretation'].includes(key)).map(([key, value]) => `
+                                    <small><strong>${key.replace(/_/g, ' ')}:</strong> ${typeof value === 'number' ? value.toFixed(3) : value}</small>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        function getStatusClass(status) {
+            const statusLower = status.toLowerCase();
+            if (statusLower.includes('normal') || statusLower.includes('intact')) return 'status-normal';
+            if (statusLower.includes('concerning') || statusLower.includes('mild')) return 'status-concerning';
+            return 'status-abnormal';
+        }
+        
+        function displayClinicalObservations(observations) {
+            document.getElementById('clinicalSection').style.display = 'block';
+            
+            // Pause Analysis
+            const pauseAnalysis = document.getElementById('pauseAnalysis');
+            pauseAnalysis.innerHTML = `
+                <p><strong>Pause Frequency:</strong> ${observations.pause_analysis.pause_frequency.toFixed(3)} pauses/sec</p>
+                <p><strong>Average Duration:</strong> ${observations.pause_analysis.average_pause_duration.toFixed(3)}s</p>
+                <p><strong>Pause Variability:</strong> ${observations.pause_analysis.pause_variability.toFixed(3)}</p>
+                <p><strong>Clinical Significance:</strong> <span class="${observations.pause_analysis.clinical_significance === 'High' ? 'text-danger' : 'text-success'}">${observations.pause_analysis.clinical_significance}</span></p>
+            `;
+            
+            // Hesitation Patterns
+            const hesitationPatterns = document.getElementById('hesitationPatterns');
+            hesitationPatterns.innerHTML = `
+                <p><strong>Filled Pauses:</strong> ${observations.hesitation_patterns.filled_pauses.toFixed(0)}</p>
+                <p><strong>Word Repetitions:</strong> ${observations.hesitation_patterns.word_repetitions.toFixed(0)}</p>
+                <p><strong>Word-Finding Episodes:</strong> ${observations.hesitation_patterns.word_finding_episodes.toFixed(0)}</p>
+                <p><strong>Severity:</strong> <span class="${getSeverityClass(observations.hesitation_patterns.severity)}">${observations.hesitation_patterns.severity}</span></p>
+            `;
+            
+            // Speech Motor Control
+            const speechMotorControl = document.getElementById('speechMotorControl');
+            speechMotorControl.innerHTML = `
+                <p><strong>Voice Tremor:</strong> ${observations.speech_motor_control.voice_tremor_indicator.toFixed(4)}</p>
+                <p><strong>Amplitude Instability:</strong> ${observations.speech_motor_control.amplitude_instability.toFixed(4)}</p>
+                <p><strong>Phonatory Control:</strong> ${observations.speech_motor_control.phonatory_control.toFixed(2)}</p>
+                <p><strong>Motor Speech:</strong> <span class="${observations.speech_motor_control.motor_speech_integrity === 'Intact' ? 'text-success' : 'text-danger'}">${observations.speech_motor_control.motor_speech_integrity}</span></p>
+            `;
+            
+            // Cognitive-Linguistic Markers
+            const cognitiveLinguistic = document.getElementById('cognitiveLinguistic');
+            cognitiveLinguistic.innerHTML = `
+                <p><strong>Lexical Access:</strong> ${observations.cognitive_linguistic_markers.lexical_access_efficiency.toFixed(3)}</p>
+                <p><strong>Semantic Network:</strong> ${observations.cognitive_linguistic_markers.semantic_network_integrity.toFixed(3)}</p>
+                <p><strong>Discourse Coherence:</strong> ${observations.cognitive_linguistic_markers.discourse_coherence.toFixed(3)}</p>
+                <p><strong>Information Content:</strong> ${observations.cognitive_linguistic_markers.information_content.toFixed(3)}</p>
+                <p><strong>Cognitive Load:</strong> ${observations.cognitive_linguistic_markers.cognitive_load_indicators.toFixed(0)}</p>
+            `;
+            
+            // Clinical Impression
+            const clinicalImpression = document.getElementById('clinicalImpression');
+            const impression = observations.overall_clinical_impression;
+            clinicalImpression.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Overall Assessment</h6>
+                        <p><strong>Severity:</strong> <span class="${getSeverityClass(impression.severity)}">${impression.severity}</span></p>
+                        <p>${impression.impression}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Key Findings</h6>
+                        <ul>
+                            ${impression.key_findings.map(finding => `<li>${finding}</li>`).join('')}
+                        </ul>
+                        <p><strong>Follow-up:</strong> ${impression.follow_up}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function getSeverityClass(severity) {
+            const severityLower = severity.toLowerCase();
+            if (severityLower.includes('normal')) return 'text-success';
+            if (severityLower.includes('mild') || severityLower.includes('concerning')) return 'text-warning';
+            return 'text-danger';
+        }
+
+        function displayClinicalDomains(domains) {
+            const container = document.getElementById('clinicalDomains');
+            let html = '';
+            
+            Object.entries(domains).forEach(([domainName, domain]) => {
+                const triggerClass = domain.triggered ? 'border-danger' : 'border-success';
+                const headerClass = domain.triggered ? 'bg-danger text-white' : 'bg-success text-white';
+                const severityClass = getSeverityClass(domain.severity);
+                
+                html += `
+                    <div class="card mb-3 ${triggerClass}">
+                        <div class="card-header ${headerClass}">
+                            <h6 class="mb-0">
+                                <i class="fas ${getDomainIcon(domainName)} me-2"></i>
+                                ${formatDomainName(domainName)}
+                                ${domain.triggered ? '<span class="badge bg-warning text-dark ms-2">TRIGGERED</span>' : '<span class="badge bg-light text-dark ms-2">NORMAL</span>'}
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Clinical Indicators:</h6>
+                                    <ul class="list-unstyled">
+                                        ${Object.entries(domain.clinical_indicators).map(([key, value]) => 
+                                            `<li><strong>${formatIndicatorName(key)}:</strong> ${typeof value === 'number' ? value.toFixed(3) : value}</li>`
+                                        ).join('')}
+                                    </ul>
+                                    <p><strong>Severity:</strong> <span class="${severityClass}">${domain.severity}</span></p>
+                                    <p><strong>Vulnerability:</strong> ${domain.vulnerability}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    ${domain.environmental_warning ? `
+                                        <div class="alert alert-warning small mb-2">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            <strong>Environmental Warning:</strong><br>
+                                            ${domain.environmental_warning}
+                                        </div>
+                                    ` : ''}
+                                    <h6>Doctor Recommendations:</h6>
+                                    <ul class="small">
+                                        ${domain.doctor_recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function getDomainIcon(domainName) {
+            const icons = {
+                'fluency_coherence': 'fa-comments',
+                'lexical_semantic': 'fa-book',
+                'prosodic_features': 'fa-volume-up',
+                'speech_timing': 'fa-clock',
+                'voice_quality': 'fa-microphone'
+            };
+            return icons[domainName] || 'fa-stethoscope';
+        }
+        
+        function formatDomainName(domainName) {
+            const names = {
+                'fluency_coherence': 'Fluency & Coherence',
+                'lexical_semantic': 'Lexical Semantic',
+                'prosodic_features': 'Prosodic Features',
+                'speech_timing': 'Speech Timing',
+                'voice_quality': 'Voice Quality'
+            };
+            return names[domainName] || domainName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+        
+        function formatIndicatorName(indicatorName) {
+            return indicatorName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function createFeatureChart(features) {
+            const importantFeatures = [
+                'speaking_rate', 'pause_rate', 'type_token_ratio', 'voice_breaks',
+                'jitter', 'shimmer', 'hesitation_count', 'coherence_score'
+            ];
+
+            const data = [{
+                x: importantFeatures,
+                y: importantFeatures.map(feature => features[feature] || 0),
+                type: 'bar',
+                marker: {
+                    color: importantFeatures.map(feature => {
+                        const value = features[feature] || 0;
+                        if (feature === 'speaking_rate' && value < 100) return '#dc3545';
+                        if (feature === 'pause_rate' && value > 0.4) return '#dc3545';
+                        if (feature === 'type_token_ratio' && value < 0.35) return '#dc3545';
+                        if (feature === 'voice_breaks' && value > 3) return '#dc3545';
+                        return '#007bff';
+                    })
+                }
+            }];
+
+            const layout = {
+                title: 'Key Voice Biomarkers',
+                xaxis: { title: 'Features' },
+                yaxis: { title: 'Values' },
+                margin: { t: 50, b: 100 }
+            };
+
+            Plotly.newPlot('featureChart', data, layout, {responsive: true});
+        }
+    </script>
+</body>
+</html>
