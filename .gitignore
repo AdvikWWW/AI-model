@@ -21,30 +21,47 @@ wheels/
 *.egg
 
 # Virtual Environment
-venv/
+.venv
 env/
+venv/
 ENV/
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
 
-# OS
+# Data files
+*.pkl
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.wav
+*.mp3
+*.mp4
+*.csv
+*.xlsx
+*.xls
+*.db
+*.sqlite3
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Project specific
-recordings/*.wav
-models/*.pkl
-datasets/*/
-*.png
-*.jpg
-*.jpeg
-
-# Logs
-*.log
-
-# Environment variables
-.env
+# Dataset directories
+datasets/
+recordings/
+models/

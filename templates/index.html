@@ -459,44 +459,30 @@
             });
         }
         
-        async function selectTask(taskId) {
+        function selectTask(taskId) {
             selectedTask = taskId;
+            const taskInfo = availableTasks[taskId];
             
-            // Fetch a new random prompt for this task
-            try {
-                const response = await fetch(`/tasks/${taskId}`);
-                const taskInfo = await response.json();
-                
-                // Update the cached task info with new prompt
-                availableTasks[taskId] = taskInfo;
-                
-                // Update UI to show selected task
-                document.querySelectorAll('.task-card').forEach(card => {
-                    card.classList.remove('border-primary');
-                    card.style.backgroundColor = '';
-                });
-                
-                const selectedCard = document.querySelector(`[data-task="${taskId}"]`);
-                selectedCard.classList.add('border-primary');
-                selectedCard.style.backgroundColor = '#f8f9fa';
-                
-                // Show task prompt with new random prompt
-                taskPrompt.innerHTML = `<h5>${taskId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5><p>${taskInfo.prompt}</p>`;
-                taskPromptSection.style.display = 'block';
-                
-                // Enable recording
-                recordBtn.disabled = false;
-                recordingStatus.textContent = 'Ready to record - Click to start';
-                
-                // Scroll to prompt
-                taskPromptSection.scrollIntoView({ behavior: 'smooth' });
-            } catch (error) {
-                console.error('Error fetching new prompt:', error);
-                // Fallback to cached prompt if fetch fails
-                const taskInfo = availableTasks[taskId];
-                taskPrompt.innerHTML = `<h5>${taskId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5><p>${taskInfo.prompt}</p>`;
-                taskPromptSection.style.display = 'block';
-            }
+            // Update UI to show selected task
+            document.querySelectorAll('.task-card').forEach(card => {
+                card.classList.remove('border-primary');
+                card.style.backgroundColor = '';
+            });
+            
+            const selectedCard = document.querySelector(`[data-task="${taskId}"]`);
+            selectedCard.classList.add('border-primary');
+            selectedCard.style.backgroundColor = '#f8f9fa';
+            
+            // Show task prompt
+            taskPrompt.innerHTML = `<h5>${taskId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h5><p>${taskInfo.prompt}</p>`;
+            taskPromptSection.style.display = 'block';
+            
+            // Enable recording
+            recordBtn.disabled = false;
+            recordingStatus.textContent = 'Ready to record - Click to start';
+            
+            // Scroll to prompt
+            taskPromptSection.scrollIntoView({ behavior: 'smooth' });
         }
         
         function resetInterface() {

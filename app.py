@@ -76,97 +76,40 @@ class AlzheimersVoiceAnalyzer:
         self.model.fit(X_dummy, y_dummy)
     
     def _initialize_speech_tasks(self):
-        """Initialize 50 speech prompts across 5 task categories (10 per category)"""
-        import random
-        
+        """Initialize structured speech tasks for clinical assessment"""
         return {
             'picture_description': {
                 'name': 'Picture Description',
-                'prompts': [
-                    'Describe what you see in this kitchen scene. Include all the people, objects, and activities.',
-                    'Tell me about this park scene. What are the people doing? What objects do you notice?',
-                    'Look at this family gathering photo. Describe the people, their expressions, and the setting.',
-                    'Describe this busy street scene. What vehicles, buildings, and people can you see?',
-                    'Tell me about this beach scene. What activities and objects are visible?',
-                    'Describe this classroom setting. What are the students and teacher doing?',
-                    'Look at this garden scene. Describe the plants, tools, and any people you see.',
-                    'Tell me about this living room. Describe the furniture, decorations, and any people.',
-                    'Describe this hospital waiting room. What do you notice about the people and environment?',
-                    'Look at this restaurant scene. Describe the diners, staff, and setting.'
-                ],
-                'expected_elements': ['people', 'objects', 'actions', 'colors', 'locations', 'emotions', 'details'],
+                'prompt': 'Please describe what you see in this picture in as much detail as possible. Take your time and describe everything you notice.',
+                'expected_elements': ['people', 'objects', 'actions', 'colors', 'locations'],
                 'target_duration': 60,
                 'analysis_focus': ['semantic_access', 'visual_processing', 'descriptive_language']
             },
             'semantic_fluency': {
                 'name': 'Semantic Fluency',
-                'prompts': [
-                    'Name as many animals as you can in one minute. Start now.',
-                    'Tell me all the fruits you can think of. You have one minute.',
-                    'List as many types of vehicles as possible in one minute.',
-                    'Name all the clothing items you can think of. One minute starting now.',
-                    'Tell me as many kitchen items as you can in one minute.',
-                    'List all the colors you can name in one minute.',
-                    'Name as many sports as you can think of. One minute timer starts now.',
-                    'Tell me all the body parts you can name in one minute.',
-                    'List as many professions or jobs as possible in one minute.',
-                    'Name all the musical instruments you can think of. One minute starting now.'
-                ],
-                'expected_elements': ['category_items', 'semantic_clustering', 'fluency_rate'],
+                'prompt': 'Please name as many different animals as you can think of. You have one minute. Go ahead and start.',
+                'expected_elements': ['animal_names', 'category_switching', 'semantic_clustering'],
                 'target_duration': 60,
                 'analysis_focus': ['semantic_fluency', 'category_access', 'cognitive_flexibility']
             },
             'story_retelling': {
                 'name': 'Story Retelling',
-                'prompts': [
-                    'Listen to this story and retell it: "A woman was baking cookies when she realized she was out of sugar. She asked her neighbor for some, but they were also out. She decided to go to the store, but her car wouldn\'t start. Finally, she walked to the store and bought sugar." Now retell this story.',
-                    'Here\'s a story to retell: "A man was reading in the park when it started to rain. He ran to a nearby café for shelter. There he met an old friend from school. They talked for hours until the rain stopped." Please retell this story.',
-                    'Listen and retell: "A little girl lost her favorite toy at the playground. She looked everywhere but couldn\'t find it. Her mother helped her search. Finally, they found it under the slide where another child had been playing." Retell this story.',
-                    'Story to retell: "An elderly man was feeding birds in his garden every morning. One day, a injured bird couldn\'t fly away. He carefully took it inside, cared for it, and released it when it healed." Please retell this.',
-                    'Listen to this: "A student forgot her lunch at home. Her friend offered to share, but she was too shy to accept. By afternoon, she was very hungry. Finally, her friend insisted on sharing her sandwich." Retell this story.',
-                    'Here\'s the story: "A family planned a picnic, but it rained. They decided to have an indoor picnic instead. They spread blankets in the living room and had a wonderful time." Please retell this.',
-                    'Story to retell: "A dog escaped from its yard and got lost. A kind stranger found it and checked its collar for an address. The stranger walked the dog home to its worried family." Retell this story.',
-                    'Listen carefully: "A baker arrived early to find his shop\'s window broken. Nothing was stolen, just broken glass everywhere. He cleaned up, fixed the window, and opened on time." Please retell this.',
-                    'Here\'s the story: "Two friends planned to meet at a movie theater. One got stuck in traffic and arrived late. The movie had already started, so they decided to see the next showing instead." Retell this.',
-                    'Story to retell: "A librarian noticed books were being returned damaged. She investigated and found children were eating while reading. She created a no-food policy and the problem stopped." Please retell this.'
-                ],
-                'expected_elements': ['main_characters', 'key_events', 'sequence', 'outcome'],
+                'prompt': 'I will tell you a short story, and then I want you to retell it back to me in your own words. Here is the story: "A little boy was trying to get a cookie from a jar on a high shelf. He climbed on a stool, but it was still too high. When he stretched to reach it, he knocked over the jar and it fell, breaking on the kitchen floor. His mother heard the noise and came running." Now please retell this story.',
+                'expected_elements': ['boy', 'cookie', 'jar', 'stool', 'high', 'fell', 'broke', 'mother'],
                 'target_duration': 45,
                 'analysis_focus': ['memory_recall', 'narrative_structure', 'sequential_processing']
             },
             'procedural_description': {
                 'name': 'Procedural Description',
-                'prompts': [
-                    'Explain how to make a peanut butter and jelly sandwich, step by step.',
-                    'Describe how to brush your teeth properly, from start to finish.',
-                    'Tell me how to make a cup of coffee or tea, including all the steps.',
-                    'Explain how to tie your shoelaces, step by step.',
-                    'Describe how to wash dishes by hand, from beginning to end.',
-                    'Tell me how to make scrambled eggs, including all the steps.',
-                    'Explain how to wrap a gift, step by step.',
-                    'Describe how to plant a seed in a pot, from start to finish.',
-                    'Tell me how to change a light bulb safely, including all steps.',
-                    'Explain how to make a paper airplane, step by step.'
-                ],
-                'expected_elements': ['sequential_steps', 'materials_needed', 'actions', 'order'],
+                'prompt': 'Please explain how to make a peanut butter and jelly sandwich. Describe each step in detail, from start to finish.',
+                'expected_elements': ['bread', 'peanut_butter', 'jelly', 'knife', 'spread', 'steps'],
                 'target_duration': 90,
                 'analysis_focus': ['procedural_knowledge', 'sequential_planning', 'executive_function']
             },
             'spontaneous_speech': {
                 'name': 'Spontaneous Speech',
-                'prompts': [
-                    'Tell me about your typical daily routine from morning to evening.',
-                    'Describe your favorite hobby or activity and why you enjoy it.',
-                    'Tell me about a memorable vacation or trip you\'ve taken.',
-                    'Describe your childhood home and neighborhood.',
-                    'Tell me about your family and what they mean to you.',
-                    'Describe your favorite season and what you like about it.',
-                    'Tell me about a skill or talent you have and how you developed it.',
-                    'Describe your ideal weekend and how you would spend it.',
-                    'Tell me about a book, movie, or TV show you really enjoyed.',
-                    'Describe a challenge you\'ve overcome and how you did it.'
-                ],
-                'expected_elements': ['personal_details', 'temporal_organization', 'coherent_narrative'],
+                'prompt': 'Please tell me about your typical daily routine. Start from when you wake up and describe what you usually do throughout the day.',
+                'expected_elements': ['daily_activities', 'temporal_sequence', 'personal_details'],
                 'target_duration': 120,
                 'analysis_focus': ['discourse_coherence', 'topic_maintenance', 'spontaneous_organization']
             }
@@ -329,22 +272,12 @@ class AlzheimersVoiceAnalyzer:
         type_token_ratio = unique_word_count / word_count if word_count > 0 else 0
         avg_word_length = np.mean([len(word) for word in words]) if words else 0
         
-        # Enhanced hesitation and repetition detection
-        hesitation_markers = ['uh', 'um', 'er', 'ah', 'well', 'like', 'you know', 'so', 'actually', 'basically', 'literally']
-        hesitation_count = sum(1 for word in words if any(marker in word for marker in hesitation_markers))
+        # Hesitation and repetition patterns
+        hesitation_markers = ['uh', 'um', 'er', 'ah', 'well', 'like', 'you know']
+        hesitation_count = sum(1 for word in words if word in hesitation_markers)
         
-        # Improved repetition detection - consecutive word repetitions
-        repetition_count = 0
-        for i in range(len(words) - 1):
-            if words[i] == words[i + 1]:
-                repetition_count += 1
-        
-        # Add phrase repetitions
-        for i in range(len(words) - 2):
-            two_word_phrase = f"{words[i]} {words[i+1]}"
-            for j in range(i + 2, len(words) - 1):
-                if f"{words[j]} {words[j+1]}" == two_word_phrase:
-                    repetition_count += 1
+        # Simple repetition detection
+        repetition_count = word_count - unique_word_count
         
         # Simplified semantic and syntactic measures
         semantic_fluency = self._estimate_semantic_fluency(words)
@@ -366,169 +299,48 @@ class AlzheimersVoiceAnalyzer:
         }
     
     def _calculate_speaking_rate(self, y, sr):
-        """Calculate speaking rate with improved voice activity detection"""
-        try:
-            # Enhanced voice activity detection
-            frame_length = int(0.025 * sr)  # 25ms frames
-            hop_length = int(0.01 * sr)     # 10ms hop
-            
-            # Multi-feature voice activity detection
-            energy = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
-            zcr = librosa.feature.zero_crossing_rate(y, frame_length=frame_length, hop_length=hop_length)[0]
-            
-            # Normalize features
-            energy_norm = (energy - np.min(energy)) / (np.max(energy) - np.min(energy) + 1e-8)
-            zcr_norm = (zcr - np.min(zcr)) / (np.max(zcr) - np.min(zcr) + 1e-8)
-            
-            # Adaptive thresholding for voice activity
-            energy_threshold = np.percentile(energy_norm, 25)  # More sensitive threshold
-            zcr_threshold = np.percentile(zcr_norm, 75)
-            
-            # Voice activity: high energy AND low zero-crossing rate (characteristic of speech)
-            voiced_frames = (energy_norm > energy_threshold) & (zcr_norm < zcr_threshold)
-            
-            # Calculate speech segments
-            speech_segments = self._get_speech_segments(voiced_frames, hop_length, sr)
-            
-            if len(speech_segments) > 0:
-                total_speech_time = sum(end - start for start, end in speech_segments)
-                
-                # Estimate syllables using energy peaks in speech segments
-                syllable_count = self._estimate_syllables_from_audio(y, sr, speech_segments)
-                
-                # Convert syllables to words (average 1.3 syllables per word in English)
-                estimated_words = max(1, syllable_count / 1.3)
-                
-                # Calculate speaking rate
-                if total_speech_time > 0:
-                    speaking_rate = (estimated_words / total_speech_time) * 60
-                    return max(min(speaking_rate, 300), 30)  # Clamp between 30-300 WPM
-                else:
-                    return 120
-            else:
-                return 60  # Very slow if no clear speech detected
-                
-        except Exception as e:
-            print(f"Speaking rate calculation failed: {e}")
-            return 120
+        """Calculate speaking rate in words per minute"""
+        # Simplified estimation based on syllable detection
+        onset_frames = librosa.onset.onset_detect(y=y, sr=sr, hop_length=512)
+        syllable_count = len(onset_frames) * 0.7  # Rough approximation
+        duration_minutes = len(y) / sr / 60
+        return syllable_count / duration_minutes if duration_minutes > 0 else 0
     
-    def _get_speech_segments(self, voiced_frames, hop_length, sr):
-        """Extract continuous speech segments"""
-        segments = []
-        in_speech = False
-        start_frame = 0
-        
-        for i, is_voiced in enumerate(voiced_frames):
-            if is_voiced and not in_speech:
-                start_frame = i
-                in_speech = True
-            elif not is_voiced and in_speech:
-                # End of speech segment
-                start_time = start_frame * hop_length / sr
-                end_time = i * hop_length / sr
-                if end_time - start_time > 0.1:  # Minimum 100ms segment
-                    segments.append((start_time, end_time))
-                in_speech = False
-        
-        # Handle case where speech continues to end
-        if in_speech:
-            start_time = start_frame * hop_length / sr
-            end_time = len(voiced_frames) * hop_length / sr
-            if end_time - start_time > 0.1:
-                segments.append((start_time, end_time))
-        
-        return segments
-    
-    def _estimate_syllables_from_audio(self, y, sr, speech_segments):
-        """Estimate syllable count from audio energy peaks"""
-        syllable_count = 0
-        
-        for start_time, end_time in speech_segments:
-            start_sample = int(start_time * sr)
-            end_sample = int(end_time * sr)
-            segment = y[start_sample:end_sample]
-            
-            if len(segment) > 0:
-                # Calculate energy envelope
-                frame_length = int(0.02 * sr)  # 20ms frames
-                hop_length = int(0.01 * sr)    # 10ms hop
-                
-                energy = librosa.feature.rms(y=segment, frame_length=frame_length, hop_length=hop_length)[0]
-                
-                # Find peaks (potential syllable nuclei)
-                try:
-                    from scipy.signal import find_peaks
-                    peaks, _ = find_peaks(energy, 
-                                        height=np.percentile(energy, 30),
-                                        distance=int(0.1 * sr / hop_length))  # Min 100ms between syllables
-                    syllable_count += len(peaks)
-                except:
-                    # Fallback: estimate based on segment duration
-                    syllable_count += max(1, int((end_time - start_time) * 3))  # ~3 syllables per second
-        
-        return max(syllable_count, 1)
-
     def _analyze_pauses(self, y, sr):
-        """Enhanced pause analysis with better detection"""
-        try:
-            frame_length = int(0.025 * sr)  # 25ms frames
-            hop_length = int(0.01 * sr)     # 10ms hop
-            
-            # Multi-feature pause detection
-            energy = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
-            zcr = librosa.feature.zero_crossing_rate(y, frame_length=frame_length, hop_length=hop_length)[0]
-            
-            # Adaptive threshold based on signal characteristics
-            energy_threshold = np.percentile(energy, 15)  # Lower percentile for pause detection
-            zcr_threshold = np.percentile(zcr, 85)        # High ZCR often indicates silence/noise
-            
-            # Pause detection: low energy OR high zero-crossing rate
-            pauses = (energy < energy_threshold) | (zcr > zcr_threshold)
-            
-            # Smooth pause detection to avoid micro-pauses
-            try:
-                from scipy import ndimage
-                pauses = ndimage.binary_closing(pauses, structure=np.ones(3))  # Fill small gaps
-                pauses = ndimage.binary_opening(pauses, structure=np.ones(5))   # Remove tiny pauses
-            except:
-                pass
-            
-            # Extract pause segments
-            pause_segments = []
-            in_pause = False
-            pause_start = 0
-            
-            for i, is_pause in enumerate(pauses):
-                if is_pause and not in_pause:
-                    pause_start = i
-                    in_pause = True
-                elif not is_pause and in_pause:
-                    pause_duration = (i - pause_start) * hop_length / sr
-                    if pause_duration > 0.15:  # Minimum 150ms pause (more realistic)
-                        pause_segments.append(pause_duration)
-                    in_pause = False
-            
-            # Handle final pause
-            if in_pause:
-                pause_duration = (len(pauses) - pause_start) * hop_length / sr
-                if pause_duration > 0.15:
+        """Analyze pause patterns in speech"""
+        # Simple energy-based pause detection
+        frame_length = int(0.025 * sr)  # 25ms frames
+        hop_length = int(0.01 * sr)     # 10ms hop
+        
+        energy = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
+        threshold = np.mean(energy) * 0.1
+        
+        pauses = energy < threshold
+        pause_segments = []
+        in_pause = False
+        pause_start = 0
+        
+        for i, is_pause in enumerate(pauses):
+            if is_pause and not in_pause:
+                pause_start = i
+                in_pause = True
+            elif not is_pause and in_pause:
+                pause_duration = (i - pause_start) * hop_length / sr
+                if pause_duration > 0.1:  # Minimum 100ms pause
                     pause_segments.append(pause_duration)
-            
-            if not pause_segments:
-                return {'rate': 0, 'duration_mean': 0, 'duration_std': 0}
-            
-            total_duration = len(y) / sr
-            pause_rate = len(pause_segments) / total_duration if total_duration > 0 else 0
-            
-            return {
-                'rate': pause_rate,
-                'duration_mean': np.mean(pause_segments),
-                'duration_std': np.std(pause_segments) if len(pause_segments) > 1 else 0
-            }
-            
-        except Exception as e:
-            print(f"Pause analysis failed: {e}")
-            return {'rate': 0.2, 'duration_mean': 0.5, 'duration_std': 0.2}
+                in_pause = False
+        
+        if not pause_segments:
+            return {'rate': 0, 'duration_mean': 0, 'duration_std': 0}
+        
+        total_duration = len(y) / sr
+        pause_rate = len(pause_segments) / total_duration
+        
+        return {
+            'rate': pause_rate,
+            'duration_mean': np.mean(pause_segments),
+            'duration_std': np.std(pause_segments)
+        }
     
     def _detect_voice_activity(self, y, sr):
         """Simple voice activity detection"""
@@ -1339,116 +1151,51 @@ class AlzheimersVoiceAnalyzer:
             }
         
         elif task_type == 'semantic_fluency':
-            # Multi-category semantic fluency analysis
-            categories = {
-                'animals': ['dog', 'cat', 'bird', 'fish', 'horse', 'cow', 'pig', 'sheep', 'goat', 'chicken', 'duck', 'rabbit', 'mouse', 'rat', 'elephant', 'lion', 'tiger', 'bear', 'wolf', 'fox', 'deer', 'monkey', 'zebra', 'giraffe', 'hippo'],
-                'fruits': ['apple', 'banana', 'orange', 'grape', 'strawberry', 'peach', 'pear', 'cherry', 'plum', 'mango', 'pineapple', 'watermelon', 'lemon', 'lime', 'kiwi'],
-                'vehicles': ['car', 'truck', 'bus', 'train', 'plane', 'boat', 'ship', 'bicycle', 'motorcycle', 'helicopter', 'taxi', 'van', 'subway', 'scooter', 'ambulance'],
-                'clothing': ['shirt', 'pants', 'dress', 'shoes', 'socks', 'hat', 'jacket', 'coat', 'sweater', 'skirt', 'tie', 'belt', 'gloves', 'scarf', 'underwear'],
-                'kitchen': ['knife', 'fork', 'spoon', 'plate', 'bowl', 'cup', 'pan', 'pot', 'stove', 'oven', 'refrigerator', 'microwave', 'blender', 'toaster', 'sink'],
-                'colors': ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'black', 'white', 'brown', 'gray', 'silver', 'gold', 'violet', 'turquoise'],
-                'sports': ['football', 'basketball', 'baseball', 'soccer', 'tennis', 'golf', 'swimming', 'running', 'boxing', 'hockey', 'volleyball', 'cricket', 'rugby', 'skiing', 'cycling'],
-                'body_parts': ['head', 'arm', 'leg', 'hand', 'foot', 'eye', 'ear', 'nose', 'mouth', 'finger', 'toe', 'knee', 'elbow', 'shoulder', 'back'],
-                'professions': ['doctor', 'teacher', 'nurse', 'lawyer', 'engineer', 'chef', 'pilot', 'police', 'firefighter', 'artist', 'writer', 'musician', 'scientist', 'farmer', 'mechanic'],
-                'instruments': ['piano', 'guitar', 'violin', 'drums', 'flute', 'trumpet', 'saxophone', 'clarinet', 'harp', 'cello', 'tuba', 'harmonica', 'organ', 'banjo', 'xylophone']
-            }
+            # Count animal names mentioned
+            animals = ['dog', 'cat', 'bird', 'fish', 'horse', 'cow', 'pig', 'sheep', 'goat', 'chicken', 'duck', 'rabbit', 'mouse', 'rat', 'elephant', 'lion', 'tiger', 'bear', 'wolf', 'fox', 'deer', 'monkey', 'zebra', 'giraffe', 'hippo']
+            animal_count = sum(1 for animal in animals if animal in transcript.lower())
             
-            # Determine which category based on most matches
-            category_counts = {}
-            for category, items in categories.items():
-                count = sum(1 for item in items if item in transcript.lower())
-                if count > 0:
-                    category_counts[category] = count
-            
-            if category_counts:
-                primary_category = max(category_counts, key=category_counts.get)
-                item_count = category_counts[primary_category]
+            # Simple semantic clustering measure
+            semantic_clustering = 0.5  # Default value
+            if animal_count > 0:
+                # Basic clustering based on animal types found
+                farm_animals = sum(1 for animal in ['cow', 'pig', 'sheep', 'goat', 'chicken', 'duck'] if animal in transcript.lower())
+                wild_animals = sum(1 for animal in ['lion', 'tiger', 'bear', 'wolf', 'elephant', 'zebra'] if animal in transcript.lower())
+                pets = sum(1 for animal in ['dog', 'cat', 'bird', 'fish', 'rabbit'] if animal in transcript.lower())
                 
-                # Calculate clustering for the primary category
-                if primary_category == 'animals':
-                    farm_animals = sum(1 for animal in ['cow', 'pig', 'sheep', 'goat', 'chicken', 'duck'] if animal in transcript.lower())
-                    wild_animals = sum(1 for animal in ['lion', 'tiger', 'bear', 'wolf', 'elephant', 'zebra'] if animal in transcript.lower())
-                    pets = sum(1 for animal in ['dog', 'cat', 'bird', 'fish', 'rabbit'] if animal in transcript.lower())
-                    clusters = sum(1 for count in [farm_animals, wild_animals, pets] if count > 0)
-                    semantic_clustering = min(clusters / 3.0, 1.0)
-                else:
-                    semantic_clustering = 0.7  # Default for other categories
-            else:
-                item_count = 0
-                semantic_clustering = 0.0
-                primary_category = 'unknown'
+                clusters = sum(1 for count in [farm_animals, wild_animals, pets] if count > 0)
+                semantic_clustering = min(clusters / 3.0, 1.0)
             
             task_performance = {
-                'item_count': item_count,
-                'category': primary_category,
+                'animal_count': animal_count,
                 'semantic_clustering': semantic_clustering,
-                'fluency_rate': item_count / max(len(words) / 60, 1)
+                'fluency_rate': animal_count / max(len(words) / 60, 1)  # Animals per minute estimate
             }
         
         elif task_type == 'story_retelling':
-            # Dynamic story element detection based on common story themes
-            story_keywords = {
-                'characters': ['woman', 'man', 'girl', 'boy', 'mother', 'father', 'child', 'friend', 'baker', 'student', 'librarian', 'family', 'dog', 'stranger'],
-                'objects': ['cookie', 'jar', 'stool', 'car', 'store', 'sugar', 'rain', 'cafe', 'toy', 'playground', 'bird', 'sandwich', 'picnic', 'window', 'book'],
-                'actions': ['baking', 'climbing', 'fell', 'broke', 'walking', 'running', 'looking', 'searching', 'feeding', 'caring', 'sharing', 'planning', 'cleaning', 'investigating'],
-                'locations': ['kitchen', 'store', 'park', 'home', 'garden', 'school', 'shop', 'library', 'yard', 'theater']
-            }
-            
-            total_elements = 0
-            found_elements = 0
-            for category, elements in story_keywords.items():
-                category_found = sum(1 for element in elements if element in transcript.lower())
-                found_elements += category_found
-                total_elements += len(elements)
-            
-            recall_accuracy = found_elements / total_elements if total_elements > 0 else 0
+            # Key story elements (simplified)
+            story_elements = ['cookie', 'jar', 'stool', 'mother', 'kitchen', 'fell', 'broken', 'dishes']
+            recalled_elements = sum(1 for element in story_elements if element in transcript.lower())
+            recall_accuracy = recalled_elements / len(story_elements)
             
             task_performance = {
                 'recall_accuracy': recall_accuracy,
-                'elements_recalled': found_elements,
-                'total_elements': total_elements,
+                'elements_recalled': recalled_elements,
+                'total_elements': len(story_elements),
                 'narrative_length': len(words)
             }
         
         elif task_type == 'procedural_description':
-            # Multi-task procedural analysis
-            procedural_keywords = {
-                'sandwich': ['bread', 'slice', 'spread', 'butter', 'jam', 'peanut', 'meat', 'cheese', 'lettuce', 'tomato', 'put', 'together', 'cut'],
-                'teeth': ['brush', 'toothbrush', 'toothpaste', 'water', 'rinse', 'spit', 'clean', 'mouth', 'gums', 'circular'],
-                'coffee': ['water', 'coffee', 'filter', 'pot', 'cup', 'pour', 'heat', 'boil', 'grind', 'beans', 'sugar', 'cream'],
-                'shoelaces': ['lace', 'shoe', 'loop', 'tie', 'knot', 'pull', 'thread', 'hole', 'tight', 'bow'],
-                'dishes': ['soap', 'water', 'sponge', 'scrub', 'rinse', 'dry', 'towel', 'clean', 'plate', 'bowl'],
-                'eggs': ['egg', 'pan', 'heat', 'oil', 'butter', 'crack', 'scramble', 'stir', 'cook', 'salt', 'pepper'],
-                'gift': ['paper', 'wrap', 'tape', 'scissors', 'fold', 'cut', 'bow', 'ribbon', 'box', 'cover'],
-                'plant': ['seed', 'soil', 'pot', 'water', 'plant', 'dig', 'cover', 'sun', 'grow', 'care'],
-                'lightbulb': ['bulb', 'light', 'switch', 'screw', 'socket', 'turn', 'replace', 'safe', 'power'],
-                'airplane': ['paper', 'fold', 'crease', 'wing', 'point', 'throw', 'fly', 'straight', 'sharp']
-            }
-            
-            # Determine which procedure based on most matches
-            procedure_counts = {}
-            for procedure, steps in procedural_keywords.items():
-                count = sum(1 for step in steps if step in transcript.lower())
-                if count > 0:
-                    procedure_counts[procedure] = count
-            
-            if procedure_counts:
-                primary_procedure = max(procedure_counts, key=procedure_counts.get)
-                steps_mentioned = procedure_counts[primary_procedure]
-                total_steps = len(procedural_keywords[primary_procedure])
-                step_coverage = steps_mentioned / total_steps
-            else:
-                primary_procedure = 'unknown'
-                steps_mentioned = 0
-                total_steps = 10  # Default
-                step_coverage = 0
+            # Key steps for making a sandwich
+            sandwich_steps = ['bread', 'slice', 'spread', 'butter', 'jam', 'peanut', 'meat', 'cheese', 'lettuce', 'tomato', 'put', 'together', 'cut']
+            mentioned_steps = sum(1 for step in sandwich_steps if step in transcript.lower())
+            step_coverage = mentioned_steps / len(sandwich_steps)
             
             task_performance = {
                 'step_coverage': step_coverage,
-                'steps_mentioned': steps_mentioned,
-                'total_steps': total_steps,
-                'procedure_type': primary_procedure,
-                'procedural_detail': len(words) / 40
+                'steps_mentioned': mentioned_steps,
+                'total_steps': len(sandwich_steps),
+                'procedural_detail': len(words) / 40  # Normalize by expected length
             }
         
         elif task_type == 'spontaneous_speech':
@@ -1780,35 +1527,8 @@ analyzer = AlzheimersVoiceAnalyzer()
 
 @app.route('/tasks')
 def get_tasks():
-    """Get available speech tasks with random prompt selection"""
-    import random
-    tasks = {}
-    for task_id, task_info in analyzer.speech_tasks.items():
-        # Randomly select one prompt from the available prompts
-        selected_prompt = random.choice(task_info['prompts'])
-        tasks[task_id] = {
-            'name': task_info['name'],
-            'prompt': selected_prompt,
-            'target_duration': task_info['target_duration'],
-            'analysis_focus': task_info['analysis_focus']
-        }
-    return jsonify(tasks)
-
-@app.route('/tasks/<task_id>')
-def get_new_prompt(task_id):
-    """Get a new random prompt for a specific task"""
-    import random
-    if task_id in analyzer.speech_tasks:
-        task_info = analyzer.speech_tasks[task_id]
-        selected_prompt = random.choice(task_info['prompts'])
-        return jsonify({
-            'name': task_info['name'],
-            'prompt': selected_prompt,
-            'target_duration': task_info['target_duration'],
-            'analysis_focus': task_info['analysis_focus']
-        })
-    else:
-        return jsonify({'error': 'Task not found'}), 404
+    """Get available speech tasks"""
+    return jsonify(analyzer.speech_tasks)
 
 @app.route('/')
 def index():
