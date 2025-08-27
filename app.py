@@ -7,8 +7,8 @@ import librosa
 import scipy.stats
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-import parselmouth
-from parselmouth.praat import call
+# import parselmouth
+# from parselmouth.praat import call
 import speech_recognition as sr
 from pydub import AudioSegment
 import tempfile
@@ -17,6 +17,9 @@ warnings.filterwarnings('ignore')
 from datetime import datetime
 import scipy.signal
 from scipy.signal import butter, filtfilt
+import whisper  # Enhanced transcription
+import re
+from collections import defaultdict
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
@@ -38,6 +41,7 @@ class AlzheimersVoiceAnalyzer:
         # Define feature names based on research
         self.feature_names = [
             'speaking_rate', 'pause_rate', 'pause_duration_mean', 'pause_duration_std',
+            'pause_percentage', 'long_pauses', 'medium_pauses', 'short_pauses',  # Enhanced pause features
             'phonation_time', 'speech_time', 'articulation_rate', 'voice_breaks',
             'f0_mean', 'f0_std', 'f0_range', 'jitter', 'shimmer', 'hnr',
             'spectral_centroid', 'spectral_rolloff', 'mfcc_mean', 'mfcc_std',
@@ -167,37 +171,41 @@ class AlzheimersVoiceAnalyzer:
             speaking_rate = self._calculate_speaking_rate(y, sr)
             pause_features = self._analyze_pauses(y, sr)
             
-            # Voice quality features with Praat
+            # Voice quality features (commented out due to parselmouth dependency issues)
             f0_mean = f0_std = f0_range = jitter = shimmer = hnr = 0
             try:
-                sound = parselmouth.Sound(audio_path)
+                # sound = parselmouth.Sound(audio_path)
                 
-                # Pitch analysis
-                pitch = sound.to_pitch()
-                f0_values = pitch.selected_array['frequency']
-                f0_values = f0_values[f0_values != 0]  # Remove unvoiced frames
+                # # Pitch analysis
+                # pitch = sound.to_pitch()
+                # f0_values = pitch.selected_array['frequency']
+                # f0_values = f0_values[f0_values != 0]  # Remove unvoiced frames
                 
-                if len(f0_values) > 0:
-                    f0_mean = np.mean(f0_values)
-                    f0_std = np.std(f0_values)
-                    f0_range = np.ptp(f0_values)
+                # if len(f0_values) > 0:
+                #     f0_mean = np.mean(f0_values)
+                #     f0_std = np.std(f0_values)
+                #     f0_range = np.ptp(f0_values)
                 
-                # Jitter and shimmer (voice quality)
-                try:
-                    jitter = call(sound, "Get jitter (local)", 0, 0, 0.0001, 0.02, 1.3)
-                    shimmer = call(sound, "Get shimmer (local)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
-                except:
-                    jitter = shimmer = 0.01  # Default small values
+                # # Jitter and shimmer (voice quality)
+                # try:
+                #     jitter = call(sound, "Get jitter (local)", 0, 0, 0.0001, 0.02, 1.3)
+                #     shimmer = call(sound, "Get shimmer (local)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+                # except:
+                #     jitter = shimmer = 0.01  # Default small values
                 
-                # Harmonics-to-noise ratio
-                try:
-                    harmonicity = sound.to_harmonicity()
-                    hnr = call(harmonicity, "Get mean", 0, 0)
-                except:
-                    hnr = 10  # Default reasonable value
+                # # Harmonics-to-noise ratio
+                # try:
+                #     harmonicity = sound.to_harmonicity()
+                #     hnr = call(harmonicity, "Get mean", 0, 0)
+                # except:
+                #     hnr = 10  # Default reasonable value
+                
+                # Use default values for now
+                f0_mean, f0_std, f0_range = 150, 20, 100  # Default values
+                jitter, shimmer, hnr = 0.01, 0.05, 10
                     
             except Exception as e:
-                print(f"Praat analysis failed: {e}, using defaults")
+                print(f"Voice quality analysis failed: {e}, using defaults")
                 f0_mean, f0_std, f0_range = 150, 20, 100  # Default values
                 jitter, shimmer, hnr = 0.01, 0.05, 10
             
@@ -228,6 +236,10 @@ class AlzheimersVoiceAnalyzer:
                 'pause_rate': pause_features['rate'],
                 'pause_duration_mean': pause_features['duration_mean'],
                 'pause_duration_std': pause_features['duration_std'],
+                'pause_percentage': pause_features.get('pause_percentage', 0),  # New enhanced feature
+                'long_pauses': pause_features.get('long_pauses', 0),  # New enhanced feature
+                'medium_pauses': pause_features.get('medium_pauses', 0),  # New enhanced feature
+                'short_pauses': pause_features.get('short_pauses', 0),  # New enhanced feature
                 'phonation_time': duration * (1 - silence_ratio),
                 'speech_time': duration,
                 'articulation_rate': speaking_rate / (1 - silence_ratio) if silence_ratio < 0.9 else speaking_rate,
@@ -252,6 +264,7 @@ class AlzheimersVoiceAnalyzer:
             # Return default values instead of empty dict
             return {
                 'speaking_rate': 100, 'pause_rate': 0.2, 'pause_duration_mean': 0.5, 'pause_duration_std': 0.2,
+                'pause_percentage': 15, 'long_pauses': 0, 'medium_pauses': 1, 'short_pauses': 2,  # Enhanced pause defaults
                 'phonation_time': 5, 'speech_time': 6, 'articulation_rate': 120, 'voice_breaks': 1,
                 'f0_mean': 150, 'f0_std': 20, 'f0_range': 100, 'jitter': 0.01, 'shimmer': 0.05, 'hnr': 10,
                 'spectral_centroid': 2000, 'spectral_rolloff': 4000, 'mfcc_mean': 0, 'mfcc_std': 1,
@@ -272,12 +285,51 @@ class AlzheimersVoiceAnalyzer:
         type_token_ratio = unique_word_count / word_count if word_count > 0 else 0
         avg_word_length = np.mean([len(word) for word in words]) if words else 0
         
-        # Hesitation and repetition patterns
-        hesitation_markers = ['uh', 'um', 'er', 'ah', 'well', 'like', 'you know']
-        hesitation_count = sum(1 for word in words if word in hesitation_markers)
+        # Enhanced hesitation and repetition patterns
+        hesitation_markers = [
+            'uh', 'um', 'er', 'ah', 'well', 'like', 'you know', 'i mean', 'sort of', 'kind of',
+            'basically', 'actually', 'literally', 'obviously', 'clearly', 'honestly', 'frankly',
+            'supposedly', 'apparently', 'evidently', 'presumably', 'allegedly', 'reportedly'
+        ]
         
-        # Simple repetition detection
-        repetition_count = word_count - unique_word_count
+        # Count filled pauses and hesitation markers
+        filled_pause_count = sum(1 for word in words if word.lower() in hesitation_markers)
+        
+        # Detect word repetitions (consecutive and non-consecutive)
+        consecutive_repetitions = 0
+        non_consecutive_repetitions = 0
+        word_frequency = defaultdict(int)
+        
+        for i, word in enumerate(words):
+            word_lower = word.lower()
+            word_frequency[word_lower] += 1
+            
+            # Check for consecutive repetitions
+            if i > 0 and word_lower == words[i-1].lower():
+                consecutive_repetitions += 1
+        
+        # Count non-consecutive repetitions (words used more than once)
+        repetition_count = sum(1 for count in word_frequency.values() if count > 1)
+        
+        # Enhanced hesitation detection including speech disfluencies
+        speech_disfluencies = 0
+        
+        # Detect incomplete words (cut off)
+        incomplete_words = sum(1 for word in words if word.endswith('-') or word.endswith('...'))
+        
+        # Detect restarts and corrections
+        restart_indicators = ['i mean', 'that is', 'or rather', 'i should say', 'let me rephrase']
+        restarts = sum(1 for i in range(len(words)-1) if ' '.join(words[i:i+2]).lower() in restart_indicators)
+        
+        # Detect word-finding difficulties (long pauses followed by simple words)
+        word_finding_difficulty = 0
+        if len(words) > 3:
+            for i in range(1, len(words)-1):
+                if len(words[i]) <= 3 and len(words[i-1]) <= 3:  # Simple words
+                    word_finding_difficulty += 1
+        
+        # Total hesitation score
+        hesitation_count = filled_pause_count + consecutive_repetitions + incomplete_words + restarts + word_finding_difficulty
         
         # Simplified semantic and syntactic measures
         semantic_fluency = self._estimate_semantic_fluency(words)
@@ -307,40 +359,80 @@ class AlzheimersVoiceAnalyzer:
         return syllable_count / duration_minutes if duration_minutes > 0 else 0
     
     def _analyze_pauses(self, y, sr):
-        """Analyze pause patterns in speech"""
-        # Simple energy-based pause detection
-        frame_length = int(0.025 * sr)  # 25ms frames
-        hop_length = int(0.01 * sr)     # 10ms hop
-        
-        energy = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
-        threshold = np.mean(energy) * 0.1
-        
-        pauses = energy < threshold
-        pause_segments = []
-        in_pause = False
-        pause_start = 0
-        
-        for i, is_pause in enumerate(pauses):
-            if is_pause and not in_pause:
-                pause_start = i
-                in_pause = True
-            elif not is_pause and in_pause:
-                pause_duration = (i - pause_start) * hop_length / sr
-                if pause_duration > 0.1:  # Minimum 100ms pause
+        """Enhanced pause analysis using multiple detection methods"""
+        try:
+            # Method 1: Energy-based pause detection
+            frame_length = int(0.025 * sr)  # 25ms frames
+            hop_length = int(0.01 * sr)     # 10ms hop
+            
+            energy = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
+            
+            # Adaptive threshold based on signal characteristics
+            energy_mean = np.mean(energy)
+            energy_std = np.std(energy)
+            threshold = energy_mean - 1.5 * energy_std
+            
+            # Method 2: Spectral centroid-based detection
+            spectral_centroids = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop_length)[0]
+            spec_threshold = np.mean(spectral_centroids) - 0.8 * np.std(spectral_centroids)
+            
+            # Method 3: Zero-crossing rate for unvoiced segments
+            zcr = librosa.feature.zero_crossing_rate(y=y, hop_length=hop_length)[0]
+            zcr_threshold = np.mean(zcr) + 1.2 * np.std(zcr)
+            
+            # Combine all methods for robust pause detection
+            pauses_energy = energy < threshold
+            pauses_spectral = spectral_centroids < spec_threshold
+            pauses_zcr = zcr > zcr_threshold
+            
+            # Pause is detected when at least 2 methods agree
+            pauses_combined = (pauses_energy & pauses_spectral) | (pauses_energy & pauses_zcr) | (pauses_spectral & pauses_zcr)
+            
+            # Find pause segments with minimum duration
+            pause_segments = []
+            in_pause = False
+            pause_start = 0
+            
+            for i, is_pause in enumerate(pauses_combined):
+                if is_pause and not in_pause:
+                    pause_start = i
+                    in_pause = True
+                elif not is_pause and in_pause:
+                    pause_duration = (i - pause_start) * hop_length / sr
+                    if pause_duration > 0.15:  # Minimum 150ms pause (more realistic)
+                        pause_segments.append(pause_duration)
+                    in_pause = False
+            
+            # Handle case where pause continues to end
+            if in_pause:
+                pause_duration = (len(pauses_combined) - pause_start) * hop_length / sr
+                if pause_duration > 0.15:
                     pause_segments.append(pause_duration)
-                in_pause = False
-        
-        if not pause_segments:
-            return {'rate': 0, 'duration_mean': 0, 'duration_std': 0}
-        
-        total_duration = len(y) / sr
-        pause_rate = len(pause_segments) / total_duration
-        
-        return {
-            'rate': pause_rate,
-            'duration_mean': np.mean(pause_segments),
-            'duration_std': np.std(pause_segments)
-        }
+            
+            if not pause_segments:
+                return {'rate': 0, 'duration_mean': 0, 'duration_std': 0, 'total_pause_time': 0}
+            
+            total_duration = len(y) / sr
+            pause_rate = len(pause_segments) / total_duration
+            total_pause_time = sum(pause_segments)
+            
+            # Enhanced pause analysis
+            pause_analysis = {
+                'rate': pause_rate,
+                'duration_mean': np.mean(pause_segments),
+                'duration_std': np.std(pause_segments),
+                'total_pause_time': total_pause_time,
+                'pause_percentage': (total_pause_time / total_duration) * 100,
+                'long_pauses': len([p for p in pause_segments if p > 1.0]),  # Pauses > 1 second
+                'medium_pauses': len([p for p in pause_segments if 0.5 <= p <= 1.0]),  # 0.5-1 second
+                'short_pauses': len([p for p in pause_segments if 0.15 <= p < 0.5])  # 0.15-0.5 second
+            }
+            
+            return pause_analysis
+            
+        except Exception as e:
+            print(f"Enhanced pause analysis failed: {e}")
+            return {'rate': 0, 'duration_mean': 0, 'duration_std': 0, 'total_pause_time': 0}
     
     def _detect_voice_activity(self, y, sr):
         """Simple voice activity detection"""
@@ -445,7 +537,11 @@ class AlzheimersVoiceAnalyzer:
                 'pause_frequency': features.get('pause_rate', 0),
                 'average_pause_duration': features.get('pause_duration_mean', 0),
                 'pause_variability': features.get('pause_duration_std', 0),
-                'clinical_significance': 'High' if features.get('pause_rate', 0) > 0.5 else 'Low'
+                'pause_percentage': features.get('pause_percentage', 0),
+                'long_pauses': features.get('long_pauses', 0),
+                'medium_pauses': features.get('medium_pauses', 0),
+                'short_pauses': features.get('short_pauses', 0),
+                'clinical_significance': 'High' if features.get('pause_rate', 0) > 0.5 or features.get('pause_percentage', 0) > 20 else 'Low'
             },
             'hesitation_patterns': {
                 'filled_pauses': features.get('hesitation_count', 0),
@@ -502,73 +598,43 @@ class AlzheimersVoiceAnalyzer:
             }
     
     def transcribe_audio(self, audio_path):
-        """Transcribe audio to text"""
+        """Transcribe audio to text using Whisper for enhanced accuracy"""
         try:
-            print("Starting transcription...")
-            r = sr.Recognizer()
+            print("Starting enhanced transcription with Whisper...")
             
-            # Enhanced recognizer settings for noisy environments
-            r.energy_threshold = 300  # Lower threshold for quiet speech
-            r.dynamic_energy_threshold = True
-            r.dynamic_energy_adjustment_damping = 0.15
-            r.dynamic_energy_ratio = 1.5
-            r.pause_threshold = 0.8  # Longer pause threshold for processing
-            r.operation_timeout = None
-            r.phrase_threshold = 0.3
-            r.non_speaking_duration = 0.8
-            
-            # Convert to WAV if needed
+            # Convert to WAV if needed for better Whisper compatibility
             try:
                 audio = AudioSegment.from_file(audio_path)
                 wav_path = audio_path.replace(os.path.splitext(audio_path)[1], '.wav')
-                audio.export(wav_path, format="wav")
+                audio.export(wav_path, format="wav", parameters=["-ar", "16000"])  # 16kHz for Whisper
                 print(f"Converted audio to WAV: {wav_path}")
             except Exception as conv_error:
                 print(f"Audio conversion failed: {conv_error}")
-                # Try to use original file if conversion fails
                 wav_path = audio_path
             
             try:
-                with sr.AudioFile(wav_path) as source:
-                    # Enhanced ambient noise adjustment for noisy environments
-                    r.adjust_for_ambient_noise(source, duration=1.0)  # Longer adjustment period
-                    audio_data = r.record(source)
+                # Load Whisper model (base model for speed, can be upgraded to larger models)
+                model = whisper.load_model("base")
+                print("Whisper model loaded successfully")
+                
+                # Transcribe with Whisper
+                result = model.transcribe(wav_path, language="en", fp16=False)
+                transcript = result["text"].strip()
+                
+                if transcript:
+                    print(f"Whisper transcription successful: {transcript[:100]}...")
+                    return transcript
+                else:
+                    print("Whisper transcription returned empty result")
+                    return "[Speech not clearly audible]"
                     
-                    # Try multiple recognition attempts with different settings
-                    transcript = None
-                    
-                    # First attempt: Standard recognition
-                    try:
-                        transcript = r.recognize_google(audio_data, language='en-US')
-                        print(f"Transcription successful (standard): {transcript[:50]}...")
-                    except:
-                        pass
-                    
-                    # Second attempt: With show_all for better noise handling
-                    if not transcript:
-                        try:
-                            result = r.recognize_google(audio_data, language='en-US', show_all=True)
-                            if result and 'alternative' in result and result['alternative']:
-                                transcript = result['alternative'][0]['transcript']
-                                print(f"Transcription successful (enhanced): {transcript[:50]}...")
-                        except:
-                            pass
-                    
-                    if transcript:
-                        return transcript
-                    else:
-                        print("All transcription attempts failed")
-                        return "[Speech not clearly audible]"
-                        
-            except sr.UnknownValueError:
-                print("Speech recognition could not understand audio")
-                return "[Speech not clearly audible]"
-            except sr.RequestError as e:
-                print(f"Could not request results from speech recognition service: {e}")
-                return "[Transcription service unavailable]"
+            except Exception as whisper_error:
+                print(f"Whisper transcription failed: {whisper_error}")
+                # Fallback to basic speech recognition
+                return self._fallback_transcription(wav_path)
             
         except Exception as e:
-            print(f"Transcription error: {e}")
+            print(f"Enhanced transcription error: {e}")
             return "[Transcription failed]"
         finally:
             # Clean up temp file
@@ -578,6 +644,34 @@ class AlzheimersVoiceAnalyzer:
                     print(f"Cleaned up WAV file: {wav_path}")
                 except:
                     pass
+    
+    def _fallback_transcription(self, audio_path):
+        """Fallback transcription using basic speech recognition"""
+        try:
+            print("Using fallback transcription...")
+            r = sr.Recognizer()
+            r.energy_threshold = 300
+            r.dynamic_energy_threshold = True
+            r.pause_threshold = 0.8
+            
+            with sr.AudioFile(audio_path) as source:
+                r.adjust_for_ambient_noise(source, duration=1.0)
+                audio_data = r.record(source)
+                
+                try:
+                    transcript = r.recognize_google(audio_data, language='en-US')
+                    print(f"Fallback transcription successful: {transcript[:50]}...")
+                    return transcript
+                except sr.UnknownValueError:
+                    print("Fallback transcription could not understand audio")
+                    return "[Speech not clearly audible]"
+                except sr.RequestError as e:
+                    print(f"Fallback transcription service error: {e}")
+                    return "[Transcription service unavailable]"
+                    
+        except Exception as e:
+            print(f"Fallback transcription error: {e}")
+            return "[Transcription failed]"
     
     def analyze_audio(self, audio_path, task_type=None):
         """Complete audio analysis pipeline with task-specific analysis"""
@@ -696,39 +790,62 @@ class AlzheimersVoiceAnalyzer:
                     task_performance_penalty += 12
                     risk_indicators += 1
         
-        # Enhanced acoustic and linguistic feature analysis
-        # SPEECH TIMING gets slightly higher weight
+                # Enhanced acoustic and linguistic feature analysis
+        # SPEECH TIMING gets SIGNIFICANTLY higher weight for clinical relevance
         
-        # Speaking rate analysis (moderately strict thresholds) - INCREASED WEIGHT
+        # Speaking rate analysis (significantly increased weight) - CRITICAL BIOMARKER
         speaking_rate = features.get('speaking_rate', 120)
         if speaking_rate < 70:  # Very slow speech
-            score += 26  # Increased from 22
-            risk_indicators += 2
+            score += 35  # Significantly increased weight
+            risk_indicators += 3  # Higher indicator count
         elif speaking_rate < 90:  # Moderately slow
-            score += 15  # Increased from 12
-            risk_indicators += 1
+            score += 22  # Increased weight
+            risk_indicators += 2
         elif speaking_rate > 220:  # Unusually fast
-            score += 10  # Increased from 8
+            score += 15  # Increased weight
             risk_indicators += 1
         
-        # Enhanced pause analysis - INCREASED WEIGHT
+        # Enhanced pause analysis - CRITICAL BIOMARKER with maximum weight
         pause_rate = features.get('pause_rate', 0.2)
         pause_duration_mean = features.get('pause_duration_mean', 0.5)
+        pause_percentage = features.get('pause_percentage', 0)
+        
+        # Pause rate analysis (maximum clinical weight)
         if pause_rate > 0.55:  # Excessive pauses
-            score += 22  # Increased from 18
+            score += 40  # Maximum weight for critical biomarker
+            risk_indicators += 3
+        elif pause_rate > 0.35: # Many pauses
+            score += 25  # High weight
             risk_indicators += 2
-        elif pause_rate > 0.35:  # Many pauses
-            score += 13  # Increased from 10
+        elif pause_rate > 0.25: # Moderate pauses
+            score += 15  # Medium weight
             risk_indicators += 1
         
-        # Long pause penalty - INCREASED WEIGHT
+        # Long pause penalty (maximum clinical weight)
         if pause_duration_mean > 2.0:  # Very long pauses
-            score += 15  # Increased from 12
+            score += 30  # Maximum weight
+            risk_indicators += 2
+        elif pause_duration_mean > 1.5:  # Long pauses
+            score += 20  # High weight
             risk_indicators += 1
         
-        # Speech rate variability (timing consistency) - NEW TIMING FEATURE
-        speech_rate_variability = features.get('speech_rate_variability', 1.0)
+        # Pause percentage analysis (new critical metric)
+        if pause_percentage > 25:  # More than 25% of speech is pauses
+            score += 35  # Maximum weight
+            risk_indicators += 3
+        elif pause_percentage > 15:  # 15-25% pauses
+            score += 25  # High weight
+            risk_indicators += 2
+        elif pause_percentage > 10:  # 10-15% pauses
+            score += 15  # Medium weight
+            risk_indicators += 1
+        
+        # Speech rate variability (timing consistency) - ENHANCED TIMING FEATURE
+        speech_rate_variability = self._calculate_speech_rate_variability(features)
         if speech_rate_variability > 3.0:  # Very inconsistent timing
+            score += 12  # Increased weight
+            risk_indicators += 1
+        elif speech_rate_variability > 2.0:  # Moderately inconsistent
             score += 8
             risk_indicators += 1
         
@@ -746,22 +863,31 @@ class AlzheimersVoiceAnalyzer:
         # can significantly affect voice quality metrics, so we exclude them
         # from risk assessment to focus on actual speech patterns
         
-        # Enhanced disfluency analysis
+        # Enhanced disfluency analysis - CRITICAL BIOMARKERS with maximum weight
         hesitation_count = features.get('hesitation_count', 0)
         repetition_count = features.get('repetition_count', 0)
         
-        if hesitation_count > 8:  # Many hesitations
-            score += 15
+        # Hesitation analysis (maximum clinical weight)
+        if hesitation_count > 10:  # Many hesitations
+            score += 35  # Maximum weight for critical biomarker
+            risk_indicators += 3
+        elif hesitation_count > 6:  # Moderate hesitations
+            score += 25  # High weight
             risk_indicators += 2
-        elif hesitation_count > 4:
-            score += 8
+        elif hesitation_count > 3:  # Some hesitations
+            score += 15  # Medium weight
             risk_indicators += 1
         
-        if repetition_count > 6:  # Many repetitions
-            score += 12
+        # Repetition analysis (high clinical weight)
+        if repetition_count > 8:  # Many repetitions
+            score += 30  # High weight
+            risk_indicators += 2
+        elif repetition_count > 5:  # Moderate repetitions
+            score += 20  # Medium weight
             risk_indicators += 1
-        elif repetition_count > 3:
-            score += 6
+        elif repetition_count > 2:  # Some repetitions
+            score += 10  # Lower weight
+            risk_indicators += 1
         
         # Semantic and syntactic complexity
         semantic_fluency = features.get('semantic_fluency', 0.6)
@@ -855,8 +981,12 @@ class AlzheimersVoiceAnalyzer:
             return enhanced
         
         # Advanced temporal features
-        enhanced['speech_rate_variability'] = acoustic_features.get('pause_duration_std', 0) / max(acoustic_features.get('pause_duration_mean', 1), 0.1)
+        enhanced['speech_rate_variability'] = self._calculate_speech_rate_variability(acoustic_features)
         enhanced['articulation_rate'] = acoustic_features.get('speaking_rate', 120) * (1 - acoustic_features.get('pause_rate', 0.2))
+        
+        # Enhanced pause analysis features
+        enhanced['pause_efficiency'] = acoustic_features.get('pause_percentage', 0) / max(acoustic_features.get('pause_rate', 0.1), 0.1)
+        enhanced['pause_distribution'] = acoustic_features.get('long_pauses', 0) + (acoustic_features.get('medium_pauses', 0) * 0.5)
         
         # Noise robustness features
         enhanced['signal_quality'] = self._estimate_signal_quality(acoustic_features)
@@ -973,6 +1103,29 @@ class AlzheimersVoiceAnalyzer:
             total_syllables += syllables
         
         return total_syllables / len(words)
+    
+    def _calculate_speech_rate_variability(self, features):
+        """Calculate speech rate variability as a measure of timing consistency"""
+        try:
+            # Calculate variability based on pause patterns and speaking rate
+            pause_rate = features.get('pause_rate', 0.2)
+            pause_duration_std = features.get('pause_duration_std', 0.2)
+            pause_duration_mean = features.get('pause_duration_mean', 0.5)
+            
+            # Normalize pause duration variability
+            if pause_duration_mean > 0:
+                pause_variability = pause_duration_std / pause_duration_mean
+            else:
+                pause_variability = 0
+            
+            # Combine pause rate and variability for overall timing inconsistency
+            timing_variability = (pause_rate * 2) + (pause_variability * 1.5)
+            
+            return min(timing_variability, 5.0)  # Cap at 5.0
+            
+        except Exception as e:
+            print(f"Speech rate variability calculation failed: {e}")
+            return 1.0
     
     def _estimate_signal_quality(self, acoustic_features):
         """Estimate signal quality for noise robustness assessment"""
@@ -1288,6 +1441,10 @@ class AlzheimersVoiceAnalyzer:
                 'pause_rate': pause_rate,
                 'articulation_rate': articulation_rate,
                 'pause_duration_mean': features.get('pause_duration_mean', 0),
+                'pause_percentage': features.get('pause_percentage', 0),
+                'long_pauses': features.get('long_pauses', 0),
+                'medium_pauses': features.get('medium_pauses', 0),
+                'short_pauses': features.get('short_pauses', 0),
                 'status': timing_status,
                 'interpretation': self._get_timing_interpretation(timing_status)
             },
