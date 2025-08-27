@@ -8,7 +8,7 @@ matplotlib==3.7.2
 seaborn==0.12.2
 speechrecognition==3.10.0
 pydub==0.25.1
-openai-whisper==20230918
+openai-whisper==20231117
 torch==2.0.1
 torchaudio==2.0.2
 transformers==4.33.2
